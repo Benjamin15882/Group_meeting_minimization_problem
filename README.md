@@ -19,6 +19,12 @@ Let N be a positive integer. Imagine we have N workshops and 2N groups. We have 
 
 We can find an equivalent formulation exploiting graphs (it is presented in the paper, not in the rocq file).
 
+The paper and the rocq file show the following result:
+
+**Proposition**: For all integer n bigger than 3, one can find a valid scheduling (valid with respect to the GMM problem) without any recurring encounter.
+
+Actually the only problem is that with n=2, no such solution exists (there is only one valid schedule, and it has four recurring encounters).
+
 Note: To the author's knowledge, this result is novel. However, the possibility of a prior solution cannot be entirely excluded due to the limitations of the literature search. This problem may already have been introduced, maybe with another name and a different formulation.
 
 ## Warning
