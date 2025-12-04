@@ -27,6 +27,14 @@ Actually the only problem is that with n=2, no such solution exists (there is on
 
 Note: To the author's knowledge, this result is novel. However, the possibility of a prior solution cannot be entirely excluded due to the limitations of the literature search. This problem may already have been introduced, maybe with another name and a different formulation.
 
+## Copyright
+
+\copy 2025 benjamin. Some Rights Reserved.
+
+This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0). To view a copy of this license, visit: https://creativecommons.org/licenses/by-nc/4.0/
+
+https://creativecommons.org/licenses/by-nc/4.0/legalcode.fr
+
 ## Warning
 
 Before you start reading the rocq proof, I have to apologize. I know that the proofs are ~~a bit~~ ugly. I could have used more rocq features, my way of representing Z/NZ is far from optimal. Please be indulgent, this is my first "big rocq project". I know that proofs contain many copy and paste. I know many lemma don't have inspired names. I know my proofs are really laborious. I know my definitions are low-level. But at least the proofs are correct...
