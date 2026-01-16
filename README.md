@@ -37,6 +37,19 @@ https://creativecommons.org/licenses/by-nc/4.0/legalcode.fr
 
 ## Warning
 
-Before you start reading the rocq proof, I have to apologize. I know that the proofs are ~~a bit~~ ugly. I could have used more rocq features, my way of representing Z/NZ is far from optimal. Please be indulgent, this is my first "big rocq project". I know that proofs contain many copy and paste. I know many lemma don't have inspired names. I know my proofs are really laborious. I know my definitions are low-level. But at least the proofs are correct...
+Before you start reading the rocq proof, I have to apologize. I know that the proofs are ~~a bit~~ ugly. I could have used more Rocq features, my way of representing Z/NZ is far from being optimal. Please be indulgent, this is my first "big Rocq project". I know that the proofs contain many copy and paste. I know many lemma don't have relevant names. I know my proofs are really laborious. I know my definitions are low-level. But at least the proofs are correct...
 
-If you see any error (in the definitions of my rocq file, or in the paper), please let me know.
+If you see any error (in the definitions of my rocq file, or in the paper), please let me know!
+
+
+<!--test comment-->
+<p style="direction: rtl; unicode-bidi: bidi-override;">
+test reverse
+</p>
+<p style="direction: rtl; unicode-bidi: bidi-override;">
+test reverse link [here](https://perdu.com)
+</p>
+<p style="direction: rtl; unicode-bidi: bidi-override;">
+test reverse link (moc.udrep//:sptth)[here]
+</p>
+
