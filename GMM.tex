@@ -1,0 +1,717 @@
+\documentclass{article}
+
+\usepackage[T1]{fontenc}
+
+\usepackage{lmodern}
+\usepackage[left=2.5cm,right=2.5cm,top=1.5cm,bottom=2cm]{geometry}
+
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{stmaryrd} % integer interval
+\usepackage{mathtools} % :=
+\usepackage{hyperref}
+\usepackage{cleveref} % cref
+\usepackage{enumitem}
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+% Définition du style OCaml
+\lstset{
+  language=Caml,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  frame=single,
+  breaklines=true
+}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{example}[definition]{Example}
+
+\theoremstyle{plain}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{observation}[definition]{Observation}
+\newtheorem{lemma}[definition]{Lemma}
+\newtheorem{corollary}[definition]{Corollary}
+
+\theoremstyle{remark}
+\newtheorem{remark}[definition]{Remark}
+
+
+\title{Group Meeting Minimization Problem}
+\author{benjamin}
+\date{2026}
+
+
+
+\begin{document}
+
+\maketitle
+
+
+\begin{abstract}
+
+Let us imagine we had to organize an event. One could plan to prepare several workshops, in which two groups would compete against each other. Each contest of the workshops would last the same amount of time, so that when the first wave of contest is done, the groups would rotate so that every group visits each workshop exactly once. So the time will be divided into time slots, and during the first time slot group $A$ will be competing against group $B$ in workshop $0$, group $C$ will be competing against group $D$ in workshop $1$ and so on. And during the second time slot group $Z$ will be competing against group $D$ in workshop $0$, group $A$ will be competing against group $E$ in workshop $1$... And so on and so forth for each time slot.
+
+More formally, one could prepare $N$ workshops (numbered from $0$ to $N-1$) and divide the participants into $2N$ groups (numbered from $0$ to $2N-1$). (Note that having twice as many groups is necessary to ensure that at each time slot each group is busy.) It remains to build the schedules (the ordered list of workshops that a group must visit).
+
+A schedule can be represented as a function that takes a group and a time slot and that outputs a workshop.
+
+Here are the constraints one wants to respect:
+\begin{itemize}
+\item every group has to be busy at each time slot (so the schedule is indeed well defined and is a total function)
+\item every workshop must host 2 groups at each time slot (and thus every workshop is busy at each time slot)
+\item every group has to visit each workshop exactly once
+\end{itemize}
+
+The above forces to have $2N$ groups and $N$ time slots.
+
+\end{abstract}
+
+\section{Introduction}
+
+Let us formalise our problem, that I call the Group Meeting Minimization Problem (GMM).
+
+Let $N$ be a natural number.
+
+We define $N \coloneqq \llbracket 0, N-1 \rrbracket$ and $G \coloneqq \llbracket 0, 2N-1 \rrbracket$.
+
+$N$ will be called the set of time slots and / or the set of workshops. $G$ will be called the set of groups.
+
+(Note that $N$ stands at the same time for a natural number and for the set of its predecessors, which is the same object using von Neumann ordinals \cite[Section 11]{halmos1960naive})
+
+\begin{definition}
+A \textbf{schedule} is a function $G \to N \to N$ (taking a group and a time slot and outputting a workshop).
+\end{definition}
+
+\begin{definition}
+A schedule $S$ is called \textbf{valid} if
+\begin{itemize}
+\item $S$ is total (ie is not a strictly partial function)
+\item for all $t \in N$, for all $w \in N$, $\{g \in G \mid S \ g \ t = w\}$ has cardinal 2 (ie every workshop must host 2 groups at each time slot)
+\item for all $g \in G$, $S \ g: N \to N$ is a bijection (ie each group visit all activity exactly once)
+\end{itemize}
+\end{definition}
+
+Having a valid schedule is quite easy and not very satisfying. Indeed the more natural schedules can induce what we call recurring encounters:
+
+The simplest schedule one can think of is
+\begin{lstlisting}
+let s g t = g / 2 + t
+\end{lstlisting}
+but the issue here is that the groups are always paired the same way: a group will see all workshop but always with the same group. For the event, one might want to mix the groups as much as possible. So, we add a new constraint: minimizing the number of \textbf{recurring encounters}, that is the number of time two groups meet more than once. And, ideally, the goal is to find a schedule without any recurring encounters.
+
+\begin{definition}
+A schedule $S$ is \textbf{free from recurring encounters} if for all $g1, g2 \in G$ and all $t1, t2 \in  N$,
+$$
+S \ g1 \ t1 = S \ g2 \ t1 \ \land \ S \ g1 \ t2 = S \ g2 \ t2
+\;\Longrightarrow\;
+g1 = g2 \ \lor \ t1 = t2
+$$
+\end{definition}
+
+The second simplest schedule one can think of is
+\begin{lstlisting}
+let s g t =
+  if g mod 2 = 0 then g/2 + t
+  else g/2 - t
+\end{lstlisting}
+
+Here we can show \cref{s:odd} that if $N$ is odd, then this schedule is free from recurring encounters.
+
+But, if $N$ is even, $s \ g1 \ t = s \ g1 \ t \equiv s \ g1 \ (t+N/2) = s \ g1 \ (t+N/2)$ and thus we have recurring encounters.
+
+In the following, a way to build free from recurring encounters schedules for any $N$ different from $2$ is given.
+
+Note that for $N = 2$, there is only one valid schedule (the two schedules given above coincide here, and are valid, and we can show any other schedule is not a valid one) and with this schedule, each group has one recurring encounter.
+
+
+
+
+
+\section{Pertain to Graeco-Latin squares}
+
+Let us first define Graeco-Latin squares. The following definition comes from \cite[Section 2]{bose1960further}.
+
+\begin{definition}
+    A \textbf{Latin square of order $N$} is an arrangement of $N$ symbols (say $0, 1, . . . , N-1$) in a $N \times N$ square such that each symbol occurs exactly once in every row and once in every column.
+    Two Latin squares are said to be \textbf{orthogonal} if, when they are superposed, each symbol of the first square occurs exactly once with each symbol of the second square.
+
+    A pair of orthogonal Latin squares is also called a \textbf{Graeco-Latin square}.
+
+    More formally, a Graeco-Latin square is a function $f: N \to N \to N \times N$ such that
+    \begin{itemize}
+        \item $\forall i, \forall k, \exists! j, k = fst (f \ i \ j)$: (each symbol $k$ occurs once (in column $j$) in the first component (fst) of every line $i$)
+        \item $\forall i, \forall k, \exists! j, k = snd (f \ i \ j)$: (each symbol $k$ occurs once (in column $j$) in the second component (snd) of every line $i$)
+        \item $\forall j, \forall k, \exists! i, k = fst (f \ i \ j)$: (each symbol $k$ occurs once (in line $i$) in the first component (fst) of every column $j$)
+        \item $\forall j, \forall k, \exists! i, k = snd (f \ i \ j)$: (each symbol $k$ occurs once (in line $i$) in the second component (snd) of every column $j$)
+        \item $\forall k_1, k_2, \exists! i, j, f \ i \ j = (k_1, k_2)$: (the two squares are orthogonal)
+    \end{itemize}
+\end{definition}
+
+\begin{remark}
+    Equivalently, one can express this in terms of bijections: $f: N \to N \to N \times N$ is a Graeco-Latin square if and only if:
+    \begin{itemize}
+        \item $\forall i, j \mapsto fst (f \ i \ j)$ is a bijection
+        \item $\forall i, j \mapsto snd (f \ i \ j)$ is a bijection
+        \item $\forall j, i \mapsto fst (f \ i \ j)$ is a bijection
+        \item $\forall j, i \mapsto snd (f \ i \ j)$ is a bijection
+        \item $f$ is a bijection
+    \end{itemize}
+\end{remark}
+
+\begin{remark}
+    According to \cite[Section 8]{bose1960further}, for all $N \in \mathbb{N} \setminus \{2, 6\}$, two orthogonal Latin squares of order $N$ exist.
+    
+    We will show in the following \cref{prop:gr-lat-sq-impl-GMM} that the existence of two orthogonal Latin squares of order $N$ gives us the existence of a valid schedule without recurring encounters for $N$ workshops. That being done, it only remains to handle $N=2$ and $N=6$.
+    
+    For $N=2$, there exists only one valid schedule, and it has recurring encounters.
+    
+    For $N=6$, there exists a valid schedule free from recurring encounters, as we will show in \cref{s:other}. Thus, we only have an implication here (as we have a valid schedule free from recurring encounters, but we do not have two orthogonal Latin squares for $N=6$, the converse of \cref{prop:gr-lat-sq-impl-GMM} does not hold). Actually, having a bipartite N-quadratic-edge-coloring is equivalent to having two orthogonal Latin squares. So, for the same reason as in \cref{rk:not-bipartite-converse}, the converse of \cref{prop:gr-lat-sq-impl-GMM} does not hold.
+    
+    In the following, I could just detail the cases $N=2$ and $N=6$, but I decided to eliminate this cut, and I will give a direct solution for all integer $N$. I decided this because the Rocq proof associated with this paper (which you can find, linked in the conclusion) is not based on Graeco-Latin squares. This paper is just here to present the main ideas of the Rocq proof in what could be a more readable format, and this section is only here to explain how my problem relates with Graeco-Latin squares. So it feels more natural to me to follow the idea of the proof of the Rocq file, making this cut, and just present this here, to give more background. the Rocq file is the proof. This paper is just here to illustrate it, and to give a more general view.
+\end{remark}
+
+\begin{proposition}\label{prop:gr-lat-sq-impl-GMM}
+    the existence of two orthogonal Latin squares of order $N$ gives us the existence of a valid schedule without recurring encounters for $N$ workshops.
+\end{proposition}
+
+\begin{proof}
+    Let $N$ be a natural number. Assume there exists a Graeco-Latin square $f$ of order $N$. Let us build a valid schedule without recurring encounters $S$ (for $N$ workshops).
+
+    Intuitively, $f \ a \ t$ will be interpreted as the pair of groups at workshop $a$ at time $t$: if $f \ a \ t = (k_1, k_2)$ then $g_1 = 2k$ and $g_2 = 2k+1$ will be at workshop $a$ at time $t$.
+
+    For all $g \in G, t \in N$, define \[S \ g \ t \coloneqq
+\begin{cases}
+(fst (f \ \cdot \ t))^{-1}(\frac{g}{2}) & \text{if $g$ is even} \\
+(snd (f \ \cdot \ t))^{-1}(\frac{g-1}{2}) & \text{if $g$ is odd}
+\end{cases}\]
+
+    \begin{itemize}
+        \item $S$ is total (and well defined): follows directly from the above: for all $t$, $fst (f \ \cdot \ t)$ and $snd (f \ \cdot \ t)$ are bijections.
+        \item for $a, t \in N$, define $(k_1, k_2) \coloneqq f \ a \ t$. Observe that $S \ (2k_1) \ t = a$ and $S \ (2k_2+1) \ t = a$ (clear by definition of $k_1, k_2$). So $\{g \in G \mid S \ g \ t = a\}$ has cardinal at least 2. As it is true for all $a$, it implies (by the pigeonhole principle) that $\{g \in G \mid S \ g \ t = a\}$ has cardinal exactly 2.
+        \item for $g \in G$; if $g$ is even: let us show $S \ g = t \mapsto (fst (f \ \cdot \ t))^{-1}(\frac{g}{2})$ is a bijection by giving its inverse:
+
+            Note $h: a \mapsto (fst (f \ a \ \cdot))^{-1}(\frac{g}{2})$.
+            
+            We have $h ((S g) t) = (fst (f \ ((fst (f \ \cdot \ t))^{-1}(\frac{g}{2})) \ \cdot))^{-1}(\frac{g}{2})$.
+            Note $t' = (fst (f \ ((fst (f \ \cdot \ t))^{-1}(\frac{g}{2})) \ \cdot))^{-1}(\frac{g}{2})$.
+            We have $fst (f \ ((fst (f \ \cdot \ t))^{-1}(\frac{g}{2})) \ t') = \frac{g}{2}$.
+            Moreover, note $a' = (fst (f \ \cdot \ t))^{-1}(\frac{g}{2})$.
+            We have $(fst (f \ a' \ t)) = \frac{g}{2}$.
+            So $(fst (f \ a' \ t)) = \frac{g}{2}$ and, by the above, $fst (f \ a' \ t') = \frac{g}{2}$.
+            By injectivity of $fst (f \ a' \ \cdot)$, we conclude $t' = t$, ie $h ((S g) t) = t$.
+            
+            We have $(S g) (h a) = (fst (f \ \cdot \ ((fst (f \ a \ \cdot))^{-1}(\frac{g}{2}))))^{-1}(\frac{g}{2})$.
+            Similarly, note $a' = (fst (f \ \cdot \ ((fst (f \ a \ \cdot))^{-1}(\frac{g}{2}))))^{-1}(\frac{g}{2})$.
+            We have $(fst (f \ a' \ ((fst (f \ a \ \cdot))^{-1}(\frac{g}{2})))) = \frac{g}{2}$.
+            Moreover, note $t' = ((fst (f \ a \ \cdot))^{-1}(\frac{g}{2}))$.
+            We have $(fst (f \ a \ t') = \frac{g}{2}$.
+            So $(fst (f \ a \ t') = \frac{g}{2}$ and, by the above, $(fst (f \ a' \ t'))) = \frac{g}{2}$.
+            By injectivity of $fst (f \ \cdot \ t')$, we conclude $a' = a$, ie $(S g) (h a) = a$.
+
+            The proof for $g$ odd proceeds analogously.
+        \item let $g1, g2 \in G, t1, t2 \in N$ such that $S \ g1 \ t1 = S \ g2 \ t1$ and $S \ g1 \ t2 = S \ g2 \ t2$.
+
+            Assume $g1$ and $g2$ are even. We have $(fst (f \ \cdot \ t1))^{-1}(\frac{g1}{2}) = (fst (f \ \cdot \ t1))^{-1}(\frac{g2}{2})$. Applying $a \mapsto f \ a \ t1$ to both sides gives $\frac{g1}{2} = \frac{g2}{2}$, ie $g1 = g2$.
+            
+            Similar if $g1$ and $g2$ are odd.
+            
+            Otherwise, one of them is even and the other one is odd. By symmetry, assume $g1$ is even and $g2$ is odd. Using our equalities and the fact that $f$ is an injection, we show $t1 = t2$: \\
+            We have $(fst (f \ \cdot \ t1))^{-1}(\frac{g1}{2}) = (snd (f \ \cdot \ t1))^{-1}(\frac{g2-1}{2})$ and $(fst (f \ \cdot \ t2))^{-1}(\frac{g1}{2}) = (snd (f \ \cdot \ t2))^{-1}(\frac{g2-1}{2})$. \\
+            Moreover $(fst (f \ ((fst (f \ \cdot \ t1))^{-1}(\frac{g1}{2})) \ t1)) = \frac{g1}{2}$ and $(snd (f \ ((snd (f \ \cdot \ t1))^{-1}(\frac{g2-1}{2})) \ t1)) = \frac{g2-1}{2}$ (immediate by definition of an inverse function). \\
+            So, $f \ ((fst (f \ \cdot \ t1))^{-1}(\frac{g1}{2})) \ t1 = f \ ((snd (f \ \cdot \ t1))^{-1}(\frac{g2-1}{2})) \ t1 = (\frac{g1}{2}, \frac{g2-1}{2})$ (according to the above, we know $fct$ and $snd$ of this object, thus we know the object itself). \\
+            Similarly, $f \ ((fst (f \ \cdot \ t2))^{-1}(\frac{g1}{2})) \ t2 = f \ ((snd (f \ \cdot \ t2))^{-1}(\frac{g2-1}{2})) \ t2 = (\frac{g1}{2}, \frac{g2-1}{2})$. \\
+            As $f$ is an bijection (injection), it implies $t1 = t2$.
+    \end{itemize}
+\end{proof}
+
+
+
+
+
+\section{Equivalent Formulations}
+
+This problem can be expressed in terms of functions:
+
+\begin{observation}
+    $S$ is a valid schedule if and only if $S$ is total and $\forall g \in G, S \ g$ is a bijection from $N$ to itself, and there exists a unique $f: G \times N \to G$ such that $S \ (f(g, t)) \ t = S \ g \ t$ and $g \neq f(g, t)$
+\end{observation}
+\begin{proof}
+    By double implication:
+    \begin{itemize}
+        \item $\Longrightarrow$: clear ($f$ maps each group to the unique opponent it meets at that time slot: $\forall w \in N, \forall t \in N, \#\{g \in G \mid S \ g \ t = w\} = 2$: a such $f$ clearly exist and is unique).
+        \item $\Longleftarrow$: also clear: uniqueness of $f$ ensures that $\forall w \in N, \forall t \in N, \#\{g \in G \mid S \ g \ t = w\} \leq 2$ (only one possible choice). This (and the fact that we have $2N$ groups) clearly implies that $\forall w \in N, \forall t \in N, \#\{g \in G \mid S \ g \ t = w\} = 2$ (for instant fix $t$ first and then observe all the inequalities have to be saturated due to the pigeonhole principle).
+    \end{itemize}
+\end{proof}
+
+\begin{observation}
+    A schedule is free from recurring encounters if and only if $\forall g \in G, f(g, .): N \to G$ is injective.
+\end{observation}
+\begin{proof}
+    Clear: the list of groups that $g$ will face is $[f(g, t) \mid t \in N]$. So the numbers of recurring encounters in a schedule will be the number of duplicates in this list (here we define the number of duplicate as the minimum number of elements one should remove in order to only have distinct values).
+
+    In particular,
+    a schedule is free from recurring encounters
+    $\iff$ $[f(g, t) \mid t \in N]$ has no duplicates
+    $\iff$ $\forall g \in G, f(g, .): N \to G$ is injective.
+\end{proof}
+
+
+
+This problem can also be expressed using graph and more specifically edge coloring:
+
+\begin{definition}
+    A graph $G$ is said to admit a \textbf{$N$-quadratic-edge-coloring} if:
+    \begin{itemize}
+        \item $G$ has $2N$ vertices
+        \item $G$ has $N^2$ edges, all indexed (ie colored) by a tuple: \\
+        $E = \{e_{a, t} \mid a \in N, t \in N\}$
+        \item $\forall a, t1 \neq t2: e_{a, t1} \cap e_{a, t2} = \emptyset$: edges with same first colors are independent (here, "the first color" means "the first coordinate": the workshop index).
+        \item $\forall a1 \neq a2, t: e_{a1, t} \cap e_{a2, t} = \emptyset$: edges with same second colors are independent.
+    \end{itemize}
+\end{definition}
+
+\begin{observation}
+    A graph $G$ with $k$ 2-cycles admitting a $N$-quadratic-edge-coloring has the following properties:
+    \begin{itemize}
+        \item for all $w \in N$, considering only the edges with first color $w$ will give a perfect matching.
+        \item for all $t \in N$, considering only the edges with second color $t$ will give a perfect matching.
+    \end{itemize}
+\end{observation}
+
+\begin{proof}
+    This is quite obvious (for both statements): for all $w \in N$, we have $N$ edges with this color ($e_{w, t}$ for all $t \in N$) and they are independent. We have $N$ independent edges and $2N$ vertices, thus we have a perfect matching.
+\end{proof}
+
+\begin{proposition}
+    There exist a valid schedule for $N$ workshop ($N>0$) with $k$ recurring encounters if and only if there exist a graph $G$ with $k$ 2-cycles admitting a $N$-quadratic-edge-coloring.
+\end{proposition}
+
+\begin{remark}
+    Here we say a graph has $k$ 2-cycles if $k$ is the minimum number of edges one has to remove in order to make all 2-cycles in $G$ disappear.
+\end{remark}
+
+Let us introduce an important tool before writing the proof of our proposition:
+
+\begin{definition}
+    Given a valid schedule $S$, we define $G_E$ the \textbf{encounter graph} as follow:
+    \begin{itemize}
+        \item $V = G (=2N)$
+        \item $E = \{e_{S \ g \ t, t} \coloneqq (g, g') \mid \exists t, S \ g \ t = S \ g' \ t, g \neq g'\}$
+    \end{itemize}
+    Similarly define $G_{E, t}$ the encounter graph at time $t$ as follow:
+    \begin{itemize}
+        \item $V_t = G (=2N)$
+        \item $E_t = \{(g, g') \mid S \ g \ t = S \ g' \ t, g \neq g'\}$
+    \end{itemize}
+\end{definition}
+
+\begin{proof}
+    (of the proposition above)
+    \begin{itemize}
+        \item $\Longrightarrow$: Let $S$ be a valid schedule for $N$ workshop ($N>0$) with $k$ recurring encounters. Consider $G_E$ the encounter graph. We will show $G_E$ has $k$ 2-cycles and admit a $N$-quadratic-edge-coloring.
+
+        Clearly $G_E$ has $2N$ vertices. As $\forall w \in N, \forall t \in N, \#\{g \in G \mid S \ g \ t = w\} = 2$, $G_E$ clearly has $N^2$ edges, naturally indexed by $N \times N$.
+
+        We have $\forall w, t1 \neq t2: e_{w, t1} \cap e_{w, t2} = \emptyset$: clear as $g \in e_{w, t1} \cap e_{w, t2} \implies S \ g \ t1 = w = S \ g \ t2$ which implies $t1 = t2$ as $S g$ is a bijection.
+
+        Moreover, $\forall w1 \neq w2, t: e_{w1, t} \cap e_{w2, t} = \emptyset$ as $g \in e_{w1, t} \cap e_{w2, t} \implies S \ g \ t = w1 \neq w2 = S \ g \ t$.
+
+        Having a recurring encounter is equivalent to having $S \ g1 \ t1 = S \ g2 \ t1$ and $S \ g1 \ t2 = S \ g2 \ t2$ (with $g1 \neq g2$ and $t1 \neq t2$), so it is quite clear that with $k$ recurring encounters one will have $k$ 2-cycles: removing all the 2-cycles is equivalent to remove all edges with $S \ g1 \ t = S \ g2 \ t$ except at most one (where $t$ varies), ie reducing $\{t \in N \mid S \ g1 \ t = S \ g2 \ t\}$ to a set with at most one element (for all $g1, g2$), ie removing $k$ edges (the one that corresponds to recurring encounters).
+        \item $\Longleftarrow$: Let $G$ be a graph with $k$ 2-cycles and admitting a $N$-quadratic-edge-coloring. Without loss of generality, one can assume that the vertex are indexed by integers in $2N$.
+        
+        For all $g$, for all $t$, define $S \ g \ t = w$ where $w$ is such that $g \in e_{w, t}$. A such $w$ exist and is unique as, for a fixed $t$, considering only the edges with second color $t$ will give a perfect matching (cf previous observation). So it exist a unique edge with second color $t$ in which $g$ lies.
+
+        For all $w \in N$, considering only the edges with first color $w$ will give a perfect matching (cf previous observation). So clearly $\# \{t \in N \mid S \ g \ t = w \} = \{t \in N \mid g \in e_{w, t} \} = 1$. Moreover, for all $w \in N, t \in N$, we have $\#\{g \in G \mid S \ g \ t = w\} = \#\{g \in G \mid g \in e_{w, t}\} = 2$: clear: $e_{w, t}$ is fixed and an edge contains exactly two vertices.
+
+        Finally, with the same reasoning as above, here each 2-cycle corresponds to a recurring encounter: an edge represent an encounter, so if $m>0$ edges are linking two vertices, then it means there are $m$ encounters between the groups, so $m-1$ recurring encounter (the first one is not recurrent, all the others are).
+    \end{itemize}
+\end{proof}
+
+\begin{observation}
+If a graph $G$ with a $N$-quadratic-edge-coloring is also a complete bipartite graph, then it has no 2-cycles.
+\end{observation}
+\begin{proof}
+It is clear: a complete bipartite graph has no 2-cycles (only even cycles of length at least $4$ as we only consider simple path, that do not go through the same edge twice): in a complete bipartite graph there is exactly one edge between $u \in V_1$ and $v \in V_2$, and not 2.
+
+(Just note that it makes sense to speak about complete bipartite graphs: if we have two sets of size $N$ $V_1$ and $V_2$ then the complete bipartite graph between these two will have $2N$ vertices and $N^2$ edges.)
+\end{proof}
+
+\begin{remark}\label{rk:not-bipartite-converse}
+We will see later \cref{r:not-bipartite} that the converse does not hold: one can have $N$-quadratic-edge-coloring graphs that contains odd cycles and no cycle of length 2. (That is why this problem is different from Graeco-Latin squares.)
+\end{remark}
+
+To summarize, we have the following (which is a immediate consequence of the above, the condition $k = \sum_g N - |f(g, N)|$ do not appear in the observation above but is immediately derived from its proof):
+\begin{proposition}
+    The three following statements are equivalent:
+    \begin{itemize}
+        \item There exists a valid schedule for $N$ workshop ($N>0$) with $k$ recurring encounters.
+        \item There exists a valid schedule $S$ such that $\forall g \in G, S \ g$ is a bijection from $N$ to itself, it exists a unique $f: G \times N \to G$ such that $S \ (f(g, t)) \ t = S \ g \ t$ and $g \neq f(g, t)$, and the sum of the number of collision of the $(f(g, .): N \to G)_{g\in G}$ is $k$: $k = \sum_g N - |f(g, N)|$.
+        \item There exists a graph $G$ with $k$ 2-cycles admitting a $N$-quadratic-edge-coloring.
+    \end{itemize}
+\end{proposition}
+
+
+
+
+
+\section{Case $N$ is Odd}\label{s:odd}
+
+\begin{definition}
+\begin{lstlisting}
+let s_odd g t =
+  if g mod 2 = 0 then g/2 + t
+  else g/2 - t
+\end{lstlisting}
+\end{definition}
+
+The idea behind this schedule is very simple: the even groups turn counterclockwise and the odd groups turn clockwise.
+
+\begin{observation}
+if $N$ is odd, then $s\_odd$ is a valid scheduling without any recurring encounter.
+\end{observation}
+
+\begin{proof}
+We consider the following assignment:
+\[s\_odd \ g \ t =
+\begin{cases}
+\frac{g}{2} + t \mod N, & \text{if } g \text{ is even} \\
+\frac{g-1}{2} - t \mod N, & \text{otherwise}.
+\end{cases}\]
+
+Note: we are identifying $N$ and $\mathbb{Z} / N\mathbb{Z}$ in the sens that we identify $-w$ and $N-w$ here. The real OCaml code should be the following one, but for readability, we will do this identification in the following.
+\begin{lstlisting}
+let s_odd' g t =
+  if g mod 2 = 0 then (g/2 + t) mod N
+  else (g/2 - t + N) mod N
+\end{lstlisting}
+
+\begin{itemize}
+    \item this assignment is valid:
+    \begin{itemize}
+        \item This function is clearly total.
+        \item Clearly all group visit each workshop once: let $w \in N$. \\
+        If $g$ is even: $\{t \in N \mid s\_odd \ g \ t = w\} = \{t \in N \mid \frac{g}{2} + t \mod N = w\} = \{w - \frac{g}{2} \mod N\}$: of cardinal 1. \\
+        Similar if $g$ odd.
+        \item Each workshop hosts exactly two groups at each time step. \\
+        More specifically, at time $t$ the workshop $w$ will host $2w-2t \mod 2N$ and $2w+1+2t  \mod 2N$ (clear, by definition of $s\_odd$). \\
+        So at each time slot, each workshop hosts at least two groups, and by the pigeonhole principle, exactly two groups.
+    \end{itemize}
+    \item This assignment is free from recurring encounter:
+
+    It suffices to show that each group sees at least $N$ different groups (it will imply that no group sees the same group twice, by pigeonhole principle, again (they each see $N$ different groups and there are $N$ steps in total)).
+
+    Let us show that every even group meets every odd group.
+    Let $g = 2k$ be an even group and $g' = 2k'+1$ be an odd group.
+
+    We assumed $N$ odd, let $N = 2K+1$.
+
+    We have $s\_odd \ g \ t = k + t \mod N$, $s\_odd \ g' \ t = k' - t \mod N$.
+    \begin{itemize}
+        \item if $k'-k$ is even: take $t = \frac{k'-k}{2} \mod N$:
+        \begin{align*}
+            s\_odd \ g \ t &= k + t \mod N \\
+            &= k + \frac{k'-k}{2} \mod N \\
+            &= \frac{k'+k}{2} \mod N \\
+            &= k' - \frac{k'-k}{2} \mod N \\
+            &= s\_odd \ g' \ t
+        \end{align*}
+        \item if $k'-k$ is odd: take $t = K+\frac{k'-k+1}{2} \mod N$:
+        \begin{align*}
+            s\_odd \ g \ t &= k + t \mod N \\
+            &= k + K+\frac{k'-k+1}{2} \mod N \\
+            &= K+\frac{k'+k+1}{2} \mod N \\
+            &= -K-1+\frac{k'+k+1}{2} \mod N, \quad \text{ as } K = -K-1 \mod N \\
+            &= k'-K-\frac{k'-k+1}{2} \mod N \\
+            &= s\_odd \ g' \ t
+        \end{align*}
+    \end{itemize}
+\end{itemize}
+Thus $s\_odd$ is a valid assignment without any recurring encounter (assuming $N$ is odd).
+
+\end{proof}
+
+
+
+
+
+\section[Case N is Divisible by 4]{Case $N$ is Divisible by $4$}
+
+Assume for this section that $N = 4k$ with $k \geq 1$.
+
+(Note that the GMM problem with $N=0$ is trivial, thus we can assume $k \geq 1$).
+
+We show that, in this case, the following scheduling is valid and without recurring encounter (up to identifying $N$ and $\mathbb{Z} / N\mathbb{Z}$):
+
+% assume k is already defined
+\begin{definition}
+\begin{lstlisting}
+let s_div4 g t =
+  match g mod 4 with
+  | 0 -> g/2 - t
+  | 1 when t < 2*k -> g/2 + t
+  | 1 (* when t >= 2*k *) -> g/2 + 2*k - 1 - t
+  | 2 -> g/2 + t
+  | 3 when t < 2*k -> g/2 - t
+  | _ (* 3 when t >= 2*k *) -> g/2 + 2*k + 1 + t
+\end{lstlisting}
+\end{definition}
+
+ie, with an other formalism:
+\[s\_div4 \ g \ t =
+\begin{cases}
+\frac{g}{2} - t \mod N, & \text{if } g = 0 \mod 4 \\
+\frac{g-1}{2} + t \mod N, & \text{if } g = 1 \mod 4 \text{ and } t < 2k \\
+\frac{g-1}{2} + 2k-1 -t \mod N, & \text{if } g = 1 \mod 4 \text{ and } t \geq 2k \\
+\frac{g}{2} + t \mod N, & \text{if } g = 2 \mod 4 \\
+\frac{g-1}{2} - t \mod N, & \text{if } g = 3 \mod 4  \text{ and } t < 2k \\
+\frac{g-1}{2} + 2k+1 +t \mod N, & \text{if } g = 3 \mod 4  \text{ and } t \geq 2k
+\end{cases}\]
+
+The idea here is that, as above, half of the group turn counterclockwise and the odd groups turn clockwise. The difference is that at time $t = 2k$, the odd groups go to the opposite workshop and reverse direction (ie the one turning clockwise will now turn counter‑clockwise and vice versa).
+So, at time $t = 2k$, there is a "redistribution", like a new organised shuffle, that avoids all recurring encounter.
+
+Let us show $s\_div4$ is valid and has no recurring encounter.
+
+\begin{itemize}
+    \item This function is clearly total.
+
+    \item Clearly all group visit each workshop (exactly) once:
+    \begin{itemize}
+        \item if $g = 0 \mod 4$ or $g = 2 \mod 4$: clear: the group moves always in the same direction, by one at each step: after $N$ steps, they will have visited all workshop.
+        \item if $g = 1 \mod 4$: we want to show that $g$ never visits the same workshop twice (it implies that $g$ visits all workshop exactly once by the pigeonhole principle (as there are $N$ steps and one workshop is visited at each step, so $N$ workshop are visited, all different by the above, thus they are all visited)). \\
+        Let $t, t' \in N$ ie $0\leq t, t'\leq 4k-1$. \\
+        If $0 \leq t, t' \leq 2k-1$ or $2k \leq t, t' \leq 4k-1$, it is easy to show $t\neq t' \implies s\_div4 \ g \ t \neq s\_div4 \ g \ t'$ (same argument as above, for the odd case). \\
+        So, assume $0 \leq t \leq 2k-1$ and $2k \leq t' \leq 4k-1$ (by symmetry).
+        \begin{align*}
+            s\_div4 \ g \ t = s\_div4 \ g \ t'
+            &\implies \frac{g-1}{2} + t = \frac{g-1}{2} + 2k-1 -t' \mod N \\
+            &\implies t = 2k-1 -t' \mod N \\
+            &\implies N \mid t + t' - 2k+1 \\
+        \end{align*}
+        Which is absurd as $1 \leq t + t' - 2k+1 \leq 4k-1 = N-1$. \\
+        So indeed $t \neq t' \implies s\_div4 \ g \ t \neq s\_div4 \ g \ t'$: all workshops are visited.
+        \item if $g = 3 \mod 4$: similar to the previous case.
+    \end{itemize}
+
+    \item Each workshop hosts exactly two groups at each time step. \\
+    Let $t \in N, a \in N$. Let us show that the workshop $a$ hosts at least 2 gourps at time $t$:
+    \begin{itemize}
+        \item if $t < 2k$ and $a+t=0 \mod 2$: $s\_div4 \ (2(a+t)) \ t = s\_div4 \ (2(a-t)+1) \ t = a$
+        \item if $t < 2k$ and $a+t=1 \mod 2$: $s\_div4 \ (2(a-t)) \ t = s\_div4 \ (2(a+t)+1) \ t = a$
+        \item if $t \geq 2k$ and $a+t=0 \mod 2$:  $s\_div4 \ (2(a+t)) \ t = s\_div4 \ (2(a-t)-4k-1) \ t = a$
+        \item if $t \geq 2k$ and $a+t=1 \mod 2$: $s\_div4 \ (2(a-t)) \ t = s\_div4 \ (2(a+t)-4k+3) \ t = a$
+    \end{itemize}
+    So at each time slot, each workshop hosts at least two groups (as the groups presented above are clearly different: the first ones are even, the seconds ones are odd), and by the pigeonhole principle, exactly two groups (as we have $N$ workshops and $2N$ groups at each time slot).
+
+    \item $s\_div4$ is free from recurring encounter: for this, we show that each group sees exactly $N$ different groups. Let $g\in G$ a group: \\
+    Note $G_i \coloneqq \{g \in G \mid g=i \mod 4\}$ (for $i \in 4$)
+    \begin{itemize}
+        \item if $g = 0 \mod 4$: $g$ sees all groups in $G_1$ and $G_3$: \\
+        We already know from the above (and it is clear) that $g$ only sees groups from $G_1$ and $G_3$ (even groups only see odd ones and vice versa: it is implied by our proof in the last bullet point), so it suffices to show that, in both cases, it does not see the same group twice:
+        \begin{itemize}
+            \item if $g' \in G_1$:
+            from the above (the last bullet point), as we listed the list of all encounter at each workshop (because we show that each workshop hosts exactly two group at each time slot), we know $g\in G_0$ and $g' \in G_1$ can only meet in the case where $t<2k$ and $a+t=0 \mod 2$.
+            \begin{align*}
+                g \text{ sees } g' \text{ twice }
+                &\Longleftrightarrow \exists t \neq t',
+                  \begin{cases}
+                    \frac{g}{2} - t = \frac{g'-1}{2} + t \mod N \\
+                    \frac{g}{2} - t' = \frac{g'-1}{2} + t' \mod N
+                  \end{cases} \\
+                &\implies t-t' = t'-t \mod N \\
+                &\implies N \mid 2(t-t') \\
+                &\implies t=t'
+            \end{align*}
+            Where the last implication holds because $0 \leq t, t' < 2k$ so $0 \leq 2(t - t') < 4k = N$.
+            \item similar if $g' \in G_3$: \\
+            We know $G\in G_0$ and $g' \in G_3$ can only meet in the case where $t\geq 2k$ and $a+t=0 \mod 2$.
+            \begin{align*}
+                g \text{ sees } g' \text{ twice }
+                &\Longleftrightarrow \exists t \neq t',
+                  \begin{cases}
+                    \frac{g}{2} - t = \frac{g'-1}{2} +2k +1 + t \mod N \\
+                    \frac{g}{2} - t' = \frac{g'-1}{2} +2k +1 + t' \mod N
+                  \end{cases} \\
+                &\implies t-t' = t'-t \mod N \\
+                &\implies t=t'
+            \end{align*}
+            Where the last implication holds because $2k \leq t, t' < 4k=N$ so $0 \leq 2(t - t') < 4k = N$.
+        \end{itemize}
+        \item if $g = 2 \mod 4$: $g$ sees all groups in $G_1$ and $G_3$: similar to the previous case: for $0\leq t < 2k$, $g$ will meet $G_3$ and for $2k\leq t < 4k$, $g$ will see $G_1$.
+        \item if $g = 1 \mod 4$ or $g = 3 \mod 4$: the above immediately implies $g$ sees all groups in $G_2$ and $G_4$.
+    \end{itemize}
+\end{itemize}
+
+
+
+\section[Case N = 2 mod 4]{Case $N = 2 \mod 4$}\label{s:other}
+
+\textbf{For $N=2$}:
+
+Clearly, there is only one valid schedule, up to renaming the groups.
+
+Indeed, without loss of generality, assume $s \ 0 \ 0 = s \ 1 \ 0 = 0$ and $s \ 2 \ 0 = s \ 3 \ 0 = 1$ (we can name the groups such that this holds).
+
+At the step $t=1$, the groups $0$ and $1$ have no choice but to visit the workshop $1$, and symetrically, $2$ and $3$ must visit $1$. So $s \ 0 \ 1 = s \ 1 \ 1 = 1$ and $s \ 2 \ 1 = s \ 3 \ 1 = 0$.
+
+This schedule is indeed valid, and is therefore the only valid one.
+
+So this schedule is optimal for $N=2$. Each group makes exaclty one recurring encounter.\\
+
+
+
+\textbf{Now, we assume $N = 4k+2$ with $k \geq 1$}:
+
+We show that in this case there exist a scheduling free from recurring encounter by building one.
+
+before this, introduce the notion of difference sequence:
+\begin{definition}
+    A \textbf{difference sequence} is an (ordered) list of $N-1$ elements in $\mathbb{Z}/N\mathbb{Z}$. We will use python-like syntax to define them.
+
+    A difference sequence $l$ defines unambiguously a schedule $s$ for a given group $g$ with the following conventions:
+    \begin{itemize}
+        \item $s \ g \ 0 = \lfloor \frac{g}{2} \rfloor$
+        \item $s \ g \ (t+1) = s \ g \ t + l[t]$ (again, using python-like syntax for lists)
+    \end{itemize}
+
+    So, instead of giving a schedule, one can associate a difference sequence with each group.
+\end{definition}
+
+\begin{remark}
+    For the lists, we will use the python syntax, except for list concatenation, that will be denoted by \texttt{@}. I decide not using \texttt{+} to denote a non-commutative operation.
+\end{remark}
+
+A difference sequence is easy to interpret; it give the moves of each group: after their ith activity, the group $g$ must move from $l[i]$ workshops.
+
+Let us now consider $s\_other$, the scheduling induced by the following: the difference sequences associated with a group $g$ is
+\[\begin{cases}
+\texttt{[-1 for \_ in range(n-4)] @ [-3, 1, 1]}, & \text{if } g = 0 \mod 4 \\
+\texttt{[1 for \_ in range(n//2-2)] @ [n//2+1] @} \\ \quad \texttt{[-1 for \_ in range(n//2-3)] @ [-3, 1, 1]}, & \text{if } g = 1 \mod 4 \\
+\texttt{[1 for \_ in range(n-4)] @ [1, 2, -1]}, & \text{if } g = 2 \mod 4 \\
+\texttt{[-1 for \_ in range(n//2-2)] @ [-n//2-1] @} \\ \quad \texttt{[1 for \_ in range(n//2-3)] @ [1, 2, -1]}, & \text{if } g = 3 \mod 4
+\end{cases}\]
+
+The idea behind this scheduling is the following: except for the very end, we reuse the idea of $s\_div4$: half of the groups go to the opposite workshop and reverse direction. The main difference is the end, which can look a bit chaotic, but allows us to "break the bipartite constraint": we know there is no Graeco-Latin square for $N=6$, so if we want a solution here, we \textbf{need} to break that constraint.
+
+Let us now prove that our scheduling is valid and free from recurring encounters.
+
+\begin{itemize}
+    \item We prove $\forall g \in G, s\_other \ g$ is a bijection (from $N$ to $N$) by showing it is a surjection: each workshop is seen at least once (sufficient by equality of the cardinals). Let $g \in G$ (all cases are clear, but we write them down explicitely as this will make the rest of the proof smother):
+    \begin{itemize}
+        \item if $g = 0 \mod 4$: clear: $g$ begins by moveing by one at each step: after $N-3$ steps, it will have visited almost all workshops; it only remains to assert it visits the few other ones. More precisely, $g$ will visit $\frac{g}{2}, \frac{g}{2} - 1, \dots, \frac{g}{2} - N + 4$ and then $\frac{g}{2} - N + 1, \frac{g}{2} - N + 2, \frac{g}{2} - N + 3$. So, by reordering these, $g$ will visit $\frac{g}{2}, \frac{g}{2} - 1, \dots, \frac{g}{2} - N + 1$ ie all workshop in $N$.
+        \item if $g = 2 \mod 4$: very similar: $g$ will visit $\frac{g}{2}, \dots,  \frac{g}{2} + n-4$ then $\frac{g}{2} + n-3, \frac{g}{2} + n-1, \frac{g}{2} + n-2$.
+        \item if $g = 1 \mod 4$: similarly, $g$ will visit $\frac{g-1}{2}, \frac{g-1}{2} + 1, \dots, \frac{g-1}{2} + \frac{N}{2} - 2$, then $\frac{g-1}{2} - 1$, then $\frac{g-1}{2} - 2, \dots \frac{g-1}{2} - \frac{N}{2} + 2$ then $\frac{g-1}{2} - \frac{N}{2} - 1, \frac{g-1}{2} - \frac{N}{2}, \frac{g-1}{2} - \frac{N}{2} + 1$.
+        \item if $g = 3 \mod 4$: similarly, $g$ will visit $\frac{g-1}{2}, \dots, \frac{g-1}{2} - \frac{N}{2} + 2$ then $\frac{g-1}{2} + 1$ then $\frac{g-1}{2} + 2, \dots, \frac{g-1}{2} + \frac{N}{2} -2$, then $\frac{g-1}{2} + \frac{N}{2} -1, \frac{g-1}{2} + \frac{N}{2} +1, \frac{g-1}{2} + \frac{N}{2}$.
+    \end{itemize}
+    \item Each workshop hosts exactly two groups at each time step: \\
+    Note $N_0 \coloneqq \{0, 2, \dots, N-2\}$ and $N_1 \coloneqq \{1, 3, \dots, N-1\}$. \\
+    Note $G_i \coloneqq \{g \in G \mid g=i \mod 4\}$ \\
+    By induction on $t$, we show that at time $t$, we have the following repartition:
+    \[\begin{cases}
+    G_0 \text{ and } G_1 \text{ dwell in } N_{t \mod 2}, G_2 \text{ and } G_3 \text{ in } N_{t+1 \mod 2} & \text{if } t < \frac{N}{2} - 1 \\
+    G_0 \text{ and } G_3 \text{ dwell in } N_{t \mod 2}, G_1 \text{ and } G_2 \text{ in } N_{t+1 \mod 2} & \text{if } \frac{N}{2} - 1 \leq t < N-2 \\
+    G_0 \text{ and } G_2 \text{ dwell in } N_{t \mod 2}, G_1 \text{ and } G_3 \text{ in } N_{t+1 \mod 2} & \text{if } N-2 \leq t < N
+    \end{cases}\]
+    (by $G_i$ dwell in $N_*$ we mean that for each workshop of $N_*$ there is exactly one group from $G_i$) \\
+    The induction is straightforward (at time $t=0$, clear by initialization, for $t>0$ just observe that adding the same even number to all group in some $G_i$ will not change the places where $G_i$ dwell in, adding an odd one will change it, so a simple disjunction on $t$ suffices). \\
+    It immediately follows that at each time $t$, each workshop hosts two groups (by our definition of "dwelling").
+    \item $s\_other$ is free from recurring encounter: for this we show that two groups never meet more than once: \\
+    We already know from the above that groups of $G_i$ do not meet other groups from $G_i$. So it suffices to show $\forall 0 \leq i < j \leq 3, g \in G_i$ and $g' \in G_j$ do not meet more than once. We have six cases (depending on $i, j$):
+    \begin{itemize}
+        \item if $i = 0, j = 1$: assume $g$ and $g'$ meet at time $t$ and $t'$. We want to show $t = t'$. \\
+        According to the above it clearly implies $0 \leq t, t' < \frac{N}{2}$ (only with these time slots can groups from $G_0$ and $G_1$ meet). So $s\_other \ g \ t = \frac{g}{2} - t, s\_other \ g \ t' = \frac{g}{2} - t', s\_other \ g' \ t = \frac{g'-1}{2} + t$ and $s\_other \ g' \ t' = \frac{g'-1}{2} + t'$ (easy to compute with our hypothesis on $t, t'$). Thus $\frac{g}{2} - t = \frac{g'-1}{2} + t$ and $\frac{g}{2} - t' = \frac{g'-1}{2} + t'$. ie $2t = 2t' = \frac{g-g'+1}{2}$ (modulo $N$). So $t$ and $t'$ are equal modulo $\frac{N}{2}$. As $0 \leq t, t' < \frac{N}{2}$, it implies $t = t'$.
+        \item if $i = 2, j = 3$: similar to the previous case.
+        \item if $i = 0, j = 3$: assume $g$ and $g'$ meet at time $t$ and $t'$. By symmetry, assume $t \leq t'$. Now by contradiction (technically, we are not using reduction ab absurdum here, since $t = t'$ is decidable) assume $t \neq t'$. \\
+        According to the above, we have $\frac{N}{2} \leq t < t' < N - 2$.
+        \begin{itemize}
+            \item if $t' = N-3$: $s\_other \ g \ t' = \frac{g}{2} - N + 1$ and $s\_other \ g' \ t' = \frac{g'-1}{2} + \frac{N}{2} - 1$, so $\frac{g-g'+1}{2} = \frac{N}{2} - 2$. Moreover $\frac{N}{2} \leq t < N - 3$. $s\_other \ g \ t = \frac{g}{2} - t$ and $s\_other \ g' \ t = \frac{g'-1}{2} + 1 + (t - \frac{N}{2})$. So $\frac{g}{2} - t = \frac{g'-1}{2} + 1 + t - \frac{N}{2}$, ie $\frac{g - g' + 1}{2} + \frac{N}{2} - 1 = 2t$. So, using the above $\frac{N}{2} - 2 + \frac{N}{2} - 1 = 2t$, ie $ - 3 = 2t$ (modulo $N$). This is obviously impossible (with parity argument for instance, as $N$ is even).
+            \item otherwise: $\frac{N}{2} \leq t, t' < N - 3$, so $s\_other \ g \ t = \frac{g}{2} - t, s\_other \ g \ t' = \frac{g}{2} - t', s\_other \ g' \ t = \frac{g'-1}{2} + 1 + (t - \frac{N}{2})$ and $s\_other \ g' \ t' = \frac{g'-1}{2} + 1 + (t' - \frac{N}{2})$. So we have $\frac{g}{2} - t = \frac{g'-1}{2} + 1 + (t - \frac{N}{2})$ and $\frac{g}{2} - t' = \frac{g'-1}{2} + 1 + (t' - \frac{N}{2})$. Therefore $t' - t = t - t'$ (by subtracting the two) ie $2t = 2t'$ (modulo $N$). So $t = t'$ modulo $\frac{N}{2}$. And as we have $\frac{N}{2} \leq t, t' < N - 3$, it implies indeed $t = t'$.
+        \end{itemize}
+        \item if $i = 1, j = 2$: similar to the previous case.
+        \item if $i = 0, j = 2$: By symmetry, assume $t \leq t'$. Now by contradiction assume $t \neq t'$. This implies $t = N-2$ and $t' = N-1$. We have $s\_other \ g \ t' = s\_other \ g \ (t+1) = (s\_other \ g \ t) + 1$ and $s\_other \ g' \ t' = s\_other \ g' \ (t+1) = (s\_other \ g' \ t) - 1$. So $s\_other \ g \ t = s\_other \ g' \ t$ and $s\_other \ g \ t' = s\_other \ g' \ t'$ implies $1 = -1$ (modulo $N$). And this is obviously an absurdity as here $N \geq 6$.
+        \item if $i = 1, j = 3$: similar to the previous case.
+    \end{itemize}
+    So, each group sees groups at most once. Thus we do not have any recurring encounter.
+\end{itemize}
+
+\begin{remark}\label{r:not-bipartite}
+    The encounter graph of the above schedule is not bipartite: there are odd cycles:
+    \begin{itemize}
+        \item let $g \in G_0$ and $g' \in G_2$ such that $g$ and $g'$ meet (such group exist: take any $g \in G_0$ and the group $g'$ it is meeting at time $t = N-1$ for instance).
+        \item $g$ met all group in $G_1$ (as $G_0$ and $G_1$ dwell in the same workshops for $\frac{N}{2} = |G_0| = |G_1|$ time steps).
+        \item $g'$ met $\frac{N}{2} - 2 > 0$ (as $N = 4k+2 \geq 6$ here) groups in $G_1$.
+    \end{itemize}
+    So $g$ and $g'$ meet and meet a common group in $G_1$. Thus the encounter graph has cycles of length 3, thus is not bipartite.
+\end{remark}
+
+
+
+
+
+\section{Conclusion}
+
+So, in the end, we have the following proposition (directly derived from the above) that solves our problem for all integers.
+
+\begin{proposition}
+    For all integer $N \geq 3$, one can find a valid scheduling without any recurring encounter.
+\end{proposition}
+
+So our problem is solved (since the cases where $N<3$ are kind of trivial; for $N<2$ they do not really make sense, for $N=2$ we will have exactly one recurring encounter per group).
+
+One can easily compute and visualize the optimal solutions presented here using \href{https://benjamin.freecluster.eu/solver_GMM/index.html}{this webpage}. It suffices to input an integer and an optimal scheduling is computed and printed. This is just a simple implementation in JavaScript of the solutions presented above.
+
+A GitHub repository has been created for this problem. You can find that repository \href{https://github.com/Benjamin15882/Group_meeting_minimization_problem}{here}. It mainly contains this paper and a Rocq file formalizing the proof of the property above.
+
+
+
+Now that this problem has been addressed, one could ask other questions.
+
+One might want to minimize the "total distance traveled by the groups between the meetings" (sum of the distances for each group) or the "time taken by the transitions" (maximum of the distances for each transition). So, one could try to find, among the free from recurring encounters schedules, one that minimize one of the above objective function.
+
+While our solution given here for odd integers also minimize these quantities (for the natural distance on $\mathbb{Z} / N\mathbb{Z}$ at least), it is not clear our solutions for even integers are also optimal in that matter. So it could be interesting to look in that direction.
+
+Before optimizing the distances, one has to choose one. A natural choice could be the natural distance on $\mathbb{Z} / N\mathbb{Z}$. One could also choose the natural distance on $\mathbb{N}$ (if the workshops form a line). Or if the workshops form a circle, one could choose the euclidian distance (identifying the workshop with the $n$th roots of unity in $\mathbb{C}$ and take the canonical norm on $\mathbb{C}$).
+
+So it can lead to a lot of problem that \textit{could} be interesting.
+
+
+
+One can also look at some generalizations of this problem. Relaxing some constraints, we get what I call the Generalized Group Meeting Minimization Problem (GGMMP):
+\begin{itemize}
+\item groups and workshops can be idle ($S$ is a partial function)
+\item workshops host $k$ groups at each busy time slot (ie at each time slot they host either $0$ or $k$ groups) (note: we can also make $k$ a function of workshops and/or time)
+\item there are $N$ workshops, $kG$ groups and $T$ time slots
+\item
+    if $N \geq G$, we can force $T = N$ (every group is busy at each time slot).
+    If $N \leq G$, we can force $T = G$ (every workshop is busy at each time slot).
+    % any workshop will host kT (busy all the time) = kG (all group visit all workshop exacly once) groups in total
+    These constraints minimize $T$ and thus minimize the total "idle time".
+\item each group visit all activity exactly once (unchanged)
+\item the goal is to minimize the number of recurring encounters (unchanged)
+\end{itemize}
+
+% add scheduling for N = 2**p?
+% difference sequence: +/- [i for i in range(1, N)]
+
+% add the difference sequences for all parts?
+% odd -> +/- [1 for _ in range(1, N)]
+% div4 -> +/- ([1 for _ in range(N//2-1)] + [N//2] + [-1 for _ in range(N//2-1)])
+
+% try to redo the Rocq proof with more powerfull / automatic tactics?
+
+\bibliographystyle{plain}
+\bibliography{GMM-biblio}
+
+\end{document}
